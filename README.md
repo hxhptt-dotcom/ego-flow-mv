@@ -1,5 +1,7 @@
 # EGO Flow 一键出片 (`ego-flow-mv`)
 
+**简体中文** | **[English](./README.en.md)**
+
 Antigravity 全局插件与多 Agent 通用自动化 Skill：把**故事 / 脚本 / 分镜创意**直接丢给 AI，自动串起 **关键帧生图 (`gpt-imagecli`) -> EGO 浏览器合法驱动 Google Flow (`Omni 1.2 Flash`) -> 下载 `1080p` 分镜 -> 本地 `ffmpeg` 无缝拼接 + 混音**，端到端输出完整 `.mp4` 成片。
 
 > 声明：本项目严格通过用户本机已登录 Google Flow（`https://flow.google.com/`）的 EGO 浏览器窗口正常交互执行，**不做任何私有 RPC 逆向，也不绕过登录或人机验证**。

@@ -385,7 +385,8 @@ async function attachFrame(page, slotLabels, stagedFilePath, stagedBaseName) {{
     () =>
       !document.body.innerText.includes("正在上传") &&
       !document.body.innerText.includes("正在加载预览") &&
-      !document.body.innerText.includes("Uploading"),
+      !document.body.innerText.includes("Uploading") &&
+      !document.body.innerText.includes("Loading preview"),
     undefined,
     {{ timeout: 45_000 }},
   );
@@ -502,7 +503,9 @@ async function main() {{
   if (promptRect) {{
     await page.mouse.click(promptRect.x, promptRect.y, {{ label: "focus prompt box" }});
   }} else {{
-    await page.click('text="您希望创作什么？"', {{ label: "focus prompt placeholder" }});
+    await page.click('text="您希望创作什么？", text="What do you want to create?"', {{
+      label: "focus prompt placeholder",
+    }});
   }}
   await page.waitForTimeout(250);
   await page.keyboard.paste(CFG.prompt);
