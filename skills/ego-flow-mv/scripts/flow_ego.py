@@ -212,7 +212,7 @@ async function ensureFlowProject(page) {{
 
   const curNow = await page.url();
   if (!curNow.includes("/project/")) {{
-    const clickedNew = await page.evaluate(() => {{
+    const newPt = await page.evaluate(() => {{
       const btns = [...document.querySelectorAll("button, a")].filter((el) => {{
         const r = el.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0) return false;
@@ -226,25 +226,28 @@ async function ensureFlowProject(page) {{
           aria.includes("New project")
         );
       }});
-      if (!btns.length) return false;
-      btns[0].click();
-      return true;
+      if (!btns.length) return null;
+      const r = btns[0].getBoundingClientRect();
+      return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
     }});
-    if (!clickedNew) {{
+    if (!newPt) {{
       return {{ ok: false, error: "NEW_PROJECT_BUTTON_NOT_FOUND", url: curNow }};
     }}
+    await page.mouse.click(newPt.x, newPt.y, {{ label: "create new Flow project" }});
     await page.waitForURL(/\\/project\\//, {{ timeout: 30_000 }});
     await page.waitForTimeout(3500);
 
     if (CFG.projectTitle) {{
-      const titleInput = await page.evaluate(() => {{
-        const el = document.querySelector('input[aria-label="可编辑文本"], input[aria-label*="Editable"]');
-        return Boolean(el);
-      }});
-      if (titleInput) {{
-        await page.fill('input[aria-label="可编辑文本"], input[aria-label*="Editable"]', CFG.projectTitle);
-        await page.keyboard.press("Enter");
-        await page.waitForTimeout(500);
+      try {{
+        const titleSel = 'input[aria-label="可编辑文本"], input[aria-label*="Editable"]';
+        const hasInput = await page.evaluate((s) => Boolean(document.querySelector(s)), titleSel);
+        if (hasInput) {{
+          await page.fill(titleSel, CFG.projectTitle, {{ timeout: 3000 }});
+          await page.keyboard.press("Enter");
+          await page.waitForTimeout(400);
+        }}
+      }} catch (_err) {{
+        // Project title input is optional; never block shot execution.
       }}
     }}
   }}
@@ -253,7 +256,7 @@ async function ensureFlowProject(page) {{
 }}
 
 async function clickPopoverPill(page, texts) {{
-  return await page.evaluate((targets) => {{
+  const pt = await page.evaluate((targets) => {{
     const isVisible = (el) => {{
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
@@ -272,16 +275,23 @@ async function clickPopoverPill(page, texts) {{
       for (const t of targets) {{
         if (raw === t || raw.includes(t) || aria === t || aria.includes(t)) {{
           const r = el.getBoundingClientRect();
-          matches.push({{ el, len: raw.length, area: r.width * r.height, top: r.top }});
+          matches.push({{ el, r, len: raw.length, area: r.width * r.height }});
           break;
         }}
       }}
     }}
     if (!matches.length) return null;
     matches.sort((a, b) => a.area - b.area || a.len - b.len);
-    matches[0].el.click();
-    return (matches[0].el.innerText || "").trim();
+    const m = matches[0];
+    return {{
+      x: Math.round(m.r.left + m.r.width / 2),
+      y: Math.round(m.r.top + m.r.height / 2),
+      text: (m.el.innerText || "").trim(),
+    }};
   }}, texts);
+  if (!pt) return null;
+  await page.mouse.click(pt.x, pt.y, {{ label: "select popover pill " + pt.text }});
+  return pt.text;
 }}
 
 async function configureSettings(page) {{
@@ -289,11 +299,18 @@ async function configureSettings(page) {{
   await page.waitForTimeout(300);
 
   // Clear stuck prompt or frames from an earlier shot when possible.
-  await page.evaluate(() => {{
+  const clrPt = await page.evaluate(() => {{
     const clr = document.querySelector('button[aria-label="清除提示"], button[aria-label*="Clear prompt"]');
-    if (clr) clr.click();
+    if (!clr) return null;
+    const r = clr.getBoundingClientRect();
+    return r.width > 0 && r.height > 0
+      ? {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }}
+      : null;
   }});
-  await page.waitForTimeout(300);
+  if (clrPt) {{
+    await page.mouse.click(clrPt.x, clrPt.y, {{ label: "clear previous prompt" }});
+    await page.waitForTimeout(300);
+  }}
 
   const triggerSel = 'button[aria-label="设置触发器"], button[aria-label*="Settings"]';
   await page.click(triggerSel, {{ label: "open Flow generation settings" }});
@@ -344,95 +361,143 @@ async function configureSettings(page) {{
 }}
 
 async function attachFrame(page, slotLabels, stagedFilePath, stagedBaseName) {{
-  const slotClicked = await page.evaluate((labels) => {{
+  const slotPt = await page.evaluate((labels) => {{
     const btns = [...document.querySelectorAll("button")].filter((el) => {{
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return false;
       const t = (el.innerText || "").trim();
       const aria = el.getAttribute("aria-label") || "";
-      return labels.some((l) => t === l || t.includes(l) || aria.includes(l));
+      if (aria.includes("开始生成") || aria.includes("Generate")) return false;
+      const tokens = t.split(/\\s+/);
+      return labels.some((l) => t === l || tokens.includes(l) || aria === l);
     }});
-    if (!btns.length) return false;
-    btns[0].click();
-    return true;
+    if (!btns.length) return null;
+    const r = btns[0].getBoundingClientRect();
+    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
   }}, slotLabels);
 
-  if (!slotClicked) {{
+  if (!slotPt) {{
     throw new Error("Could not find frame slot button for: " + slotLabels.join(", "));
   }}
+  await page.mouse.click(slotPt.x, slotPt.y, {{ label: "open frame picker" }});
   await page.waitForTimeout(700);
 
   const chooserPromise = page.waitForFileChooser({{ timeout: 20_000 }});
-  const uploadClicked = await page.evaluate(() => {{
-    const els = [...document.querySelectorAll("button, [role='menuitem'], span, div")].filter((el) => {{
+  const uploadPt = await page.evaluate(() => {{
+    const candidates = [...document.querySelectorAll("button, [role='menuitem'], span, div")].filter((el) => {{
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return false;
       const t = (el.innerText || "").trim();
       return t === "上传媒体" || t === "Upload media" || t === "Upload";
     }});
-    if (!els.length) return false;
-    els[0].click();
-    return true;
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => {{
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      return ra.width * ra.height - rb.width * rb.height;
+    }});
+    const r = candidates[0].getBoundingClientRect();
+    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
   }});
-  if (!uploadClicked) {{
+  if (!uploadPt) {{
     throw new Error("Could not locate '上传媒体' / 'Upload media' button inside frame picker.");
   }}
+  await page.mouse.click(uploadPt.x, uploadPt.y, {{
+    label: "click Upload media inside frame picker",
+  }});
   const chooser = await chooserPromise;
   await chooser.setFiles(stagedFilePath);
 
   await page.waitForTimeout(1500);
   await page.waitForFunction(
-    () =>
-      !document.body.innerText.includes("正在上传") &&
-      !document.body.innerText.includes("正在加载预览") &&
-      !document.body.innerText.includes("Uploading") &&
-      !document.body.innerText.includes("Loading preview"),
-    undefined,
+    (base) => {{
+      const root = document.querySelector('.cdk-overlay-pane, [role="dialog"]') || document.body;
+      const txt = root.innerText || "";
+      const uploading =
+        txt.includes("正在上传") ||
+        txt.includes("正在加载预览") ||
+        txt.includes("Uploading") ||
+        txt.includes("Loading preview") ||
+        /\\b\\d{{1,3}}%/.test(txt);
+      return txt.includes(base) && !uploading;
+    }},
+    stagedBaseName,
     {{ timeout: 45_000 }},
   );
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1000);
 
-  // Pitfall 1 fix: explicitly select the newly uploaded file option by unique staged basename.
-  const selectedOpt = await page.evaluate((base) => {{
-    const opts = [...document.querySelectorAll('[role="option"], [role="listbox"] > *')].filter((el) => {{
+  // Pitfall 1 fix: explicitly select the newly uploaded short filename inside the modal overlay.
+  const optPt = await page.evaluate((base) => {{
+    const root = document.querySelector('.cdk-overlay-pane, [role="dialog"]') || document.body;
+    const opts = [...root.querySelectorAll('[role="option"], [role="listbox"] > *')].filter((el) => {{
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && (el.innerText || "").includes(base);
     }});
-    if (!opts.length) return false;
-    opts[0].click();
-    return true;
+    if (!opts.length) return null;
+    const r = opts[0].getBoundingClientRect();
+    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
   }}, stagedBaseName);
 
-  if (!selectedOpt) {{
+  if (!optPt) {{
     throw new Error("Uploaded frame option not found in picker modal: " + stagedBaseName);
   }}
-  await page.waitForTimeout(800);
+  await page.mouse.click(optPt.x, optPt.y, {{ label: "select uploaded frame option" }});
+  await page.waitForTimeout(1000);
 
-  const added = await page.evaluate(() => {{
-    const els = [...document.querySelectorAll("button, span")].filter((el) => {{
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return false;
-      const t = (el.innerText || "").trim();
-      return t === "添加到提示" || t === "Add to prompt";
+  // In some Flow versions clicking [role="option"] attaches immediately and closes the modal;
+  // only click "添加到提示" / "Add to prompt" if the picker modal is still open.
+  const modalStillOpen = await page.evaluate(() =>
+    Boolean(document.querySelector('.cdk-overlay-pane [role="option"], [role="dialog"] [role="option"]')),
+  );
+  if (modalStillOpen) {{
+    let addPt = null;
+    for (let i = 0; i < 10; i++) {{
+      addPt = await page.evaluate(() => {{
+        const root = document.querySelector('.cdk-overlay-pane, [role="dialog"]') || document.body;
+        const candidates = [...root.querySelectorAll('button, [role="button"], span, div')].filter((el) => {{
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) return false;
+          if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
+          const t = (el.innerText || "").trim();
+          return t.includes("添加到提示") || t.includes("Add to prompt");
+        }});
+        if (!candidates.length) return null;
+        candidates.sort((a, b) => {{
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          return ra.width * ra.height - rb.width * rb.height;
+        }});
+        const r = candidates[0].getBoundingClientRect();
+        return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
+      }});
+      if (addPt) break;
+      await page.waitForTimeout(500);
+    }}
+    if (!addPt) {{
+      throw new Error("Could not locate '添加到提示' / 'Add to prompt' button inside modal.");
+    }}
+    await page.mouse.click(addPt.x, addPt.y, {{
+      label: "attach staged frame to prompt",
     }});
-    if (!els.length) return false;
-    els[0].click();
-    return true;
-  }});
-  if (!added) {{
-    throw new Error("Could not click '添加到提示' / 'Add to prompt'.");
+    await page.waitForTimeout(1500);
   }}
-  await page.waitForTimeout(1400);
 }}
 
 async function switchToVideosTab(page) {{
-  await page.evaluate(() => {{
+  const vidPt = await page.evaluate(() => {{
     const btns = [...document.querySelectorAll("button")].filter((b) => {{
+      const r = b.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return false;
       const t = b.innerText || "";
       return t.includes("videocam") && (t.includes("视频") || t.includes("Videos"));
     }});
-    if (btns.length) btns[0].click();
+    if (!btns.length) return null;
+    const r = btns[0].getBoundingClientRect();
+    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
   }});
+  if (vidPt) {{
+    await page.mouse.click(vidPt.x, vidPt.y, {{ label: "switch to Videos view" }});
+  }}
   await page.waitForTimeout(1200);
 }}
 
@@ -445,29 +510,31 @@ async function scanVideoCards(page) {{
       text.includes("生成失败") ||
       text.includes("Unable to generate") ||
       text.includes("violates") ||
-      text.includes("policy");
-    const pctMatch = text.match(/\\b\\d{{1,3}}%\\b/g);
+      text.includes("Something went wrong");
+    const pctMatch = text.match(/\\b\\d{{1,3}}%/g);
+    const pendingCount = document.querySelectorAll("flow-pending-tile").length;
     const playEls = [...document.querySelectorAll("*")].filter(
-      (el) => el.childNodes.length === 1 && el.textContent?.trim() === "play_circle",
+      (el) =>
+        el.childNodes.length === 1 &&
+        el.textContent?.trim() === "play_circle" &&
+        !el.closest("flow-pending-tile") &&
+        !el.closest("nav"),
     );
     const cards = [];
-    const seen = new Set();
     for (const el of playEls) {{
       let cur = el.parentElement;
-      while (cur && cur.getBoundingClientRect().width < 100) {{
+      while (cur && (cur.getBoundingClientRect().width < 100 || cur.getBoundingClientRect().height < 90)) {{
         cur = cur.parentElement;
       }}
       const r = cur?.getBoundingClientRect();
-      if (!r || r.width > 340) continue;
+      if (!r || r.width > 340 || r.height < 90) continue;
       const cx = Math.round(r.left + r.width / 2);
       const cy = Math.round(r.top + r.height / 2);
-      const key = `${{cx}}:${{cy}}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (cards.some((c) => Math.abs(c.x - cx) < 40 && Math.abs(c.y - cy) < 60)) continue;
       cards.push({{ x: cx, y: cy, w: Math.round(r.width), h: Math.round(r.height) }});
     }}
     cards.sort((a, b) => a.y - b.y || a.x - b.x);
-    return {{ hasError, pctMatch, cardCount: cards.length, cards }};
+    return {{ hasError, pctMatch, pendingCount, cardCount: cards.length, cards }};
   }});
 }}
 
@@ -503,8 +570,8 @@ async function main() {{
   if (promptRect) {{
     await page.mouse.click(promptRect.x, promptRect.y, {{ label: "focus prompt box" }});
   }} else {{
-    await page.click('text="您希望创作什么？", text="What do you want to create?"', {{
-      label: "focus prompt placeholder",
+    await page.click('[contenteditable="true"], textarea', {{
+      label: "focus fallback prompt input",
     }});
   }}
   await page.waitForTimeout(250);
@@ -534,7 +601,7 @@ async function main() {{
       }});
       return;
     }}
-    if (!finalState.pctMatch && finalState.cardCount > beforeState.cardCount) {{
+    if (!finalState.pctMatch && finalState.pendingCount === 0 && finalState.cardCount > beforeState.cardCount) {{
       break;
     }}
     await page.waitForTimeout(6000);
@@ -556,26 +623,30 @@ async function main() {{
 
   await page.waitForTimeout(2000);
   const newest = finalState.cards[0];
-  await page.mouse.move(newest.x, newest.y, {{ label: "hover newest video card" }});
-  await page.waitForTimeout(700);
-
-  const moreBtn = await page.evaluate((tx, ty) => {{
-    const btns = [...document.querySelectorAll("button")].filter((b) => {{
-      if (!(b.innerText || "").includes("more_vert")) return false;
-      const r = b.getBoundingClientRect();
-      return r.width > 0 && Math.abs(r.left + r.width / 2 - tx) < 130 && Math.abs(r.top + r.height / 2 - ty) < 180;
-    }});
-    if (!btns.length) return null;
-    btns.sort((a, b) => {{
-      const ra = a.getBoundingClientRect();
-      const rb = b.getBoundingClientRect();
-      const da = Math.hypot(ra.left - tx, ra.top - ty);
-      const db = Math.hypot(rb.left - tx, rb.top - ty);
-      return da - db;
-    }});
-    const r = btns[0].getBoundingClientRect();
-    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
-  }}, newest.x, newest.y);
+  let moreBtn = null;
+  for (const offsetY of [0, -30, 30]) {{
+    await page.mouse.move(newest.x, newest.y + offsetY, {{ label: "hover newest video card" }});
+    await page.waitForTimeout(800);
+    moreBtn = await page.evaluate(({{ tx, ty }}) => {{
+      const btns = [...document.querySelectorAll("button")].filter((b) => {{
+        const lbl = (b.textContent || b.innerText || "");
+        if (!lbl.includes("more_vert")) return false;
+        const r = b.getBoundingClientRect();
+        return r.width > 0 && Math.abs(r.left + r.width / 2 - tx) < 140 && Math.abs(r.top + r.height / 2 - ty) < 200;
+      }});
+      if (!btns.length) return null;
+      btns.sort((a, b) => {{
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const da = Math.hypot(ra.left - tx, ra.top - ty);
+        const db = Math.hypot(rb.left - tx, rb.top - ty);
+        return da - db;
+      }});
+      const r = btns[0].getBoundingClientRect();
+      return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
+    }}, {{ tx: newest.x, ty: newest.y }});
+    if (moreBtn) break;
+  }}
 
   if (!moreBtn) {{
     emit({{ ok: false, error: "MORE_MENU_BUTTON_NOT_FOUND", newest, projectUrl: projectState.projectUrl }});
@@ -585,17 +656,29 @@ async function main() {{
   await page.mouse.click(moreBtn.x, moreBtn.y, {{ label: "open card options menu" }});
   await page.waitForTimeout(600);
 
-  await page.hover('[role="menuitem"]:has-text("下载"), [role="menuitem"]:has-text("Download")', {{
-    label: "hover Download submenu",
+  const dlMenuPt = await page.evaluate(() => {{
+    const items = [...document.querySelectorAll('[role="menuitem"]')].filter((el) => {{
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return false;
+      const t = (el.innerText || "").trim();
+      return t.includes("下载") || t.includes("Download");
+    }});
+    if (!items.length) return null;
+    const r = items[0].getBoundingClientRect();
+    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
   }});
+  if (!dlMenuPt) {{
+    emit({{ ok: false, error: "DOWNLOAD_MENU_ITEM_NOT_FOUND", projectUrl: projectState.projectUrl }});
+    return;
+  }}
+
+  await page.mouse.move(dlMenuPt.x, dlMenuPt.y, {{ label: "hover Download submenu" }});
   await page.waitForTimeout(500);
   const subOpen = await page.evaluate(
     () => document.body.innerText.includes("1080p") || document.body.innerText.includes("720p"),
   );
   if (!subOpen) {{
-    await page.click('[role="menuitem"]:has-text("下载"), [role="menuitem"]:has-text("Download")', {{
-      label: "click Download submenu",
-    }});
+    await page.mouse.click(dlMenuPt.x, dlMenuPt.y, {{ label: "click Download submenu" }});
     await page.waitForTimeout(500);
   }}
 
@@ -604,10 +687,18 @@ async function main() {{
   const targets = CFG.dlRes === "1080p" && CFG.fallback720p ? ["1080p", "720p"] : [CFG.dlRes];
   for (const resLabel of targets) {{
     try {{
+      const resPt = await page.evaluate((lbl) => {{
+        const items = [...document.querySelectorAll('[role="menuitem"]')].filter((el) => {{
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && (el.innerText || "").includes(lbl);
+        }});
+        if (!items.length) return null;
+        const r = items[0].getBoundingClientRect();
+        return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
+      }}, resLabel);
+      if (!resPt) throw new Error("Resolution menu item not found: " + resLabel);
       const dlPromise = page.waitForEvent("download", {{ timeout: resLabel === "1080p" ? 160_000 : 120_000 }});
-      await page.click(`[role="menuitem"]:has-text("${{resLabel}}")`, {{
-        label: `download video at ${{resLabel}}`,
-      }});
+      await page.mouse.click(resPt.x, resPt.y, {{ label: `download video at ${{resLabel}}` }});
       download = await dlPromise;
       actualDlRes = resLabel;
       break;
@@ -641,7 +732,8 @@ def _stage_image(src_path: str | Path, stage_dir: Path, prefix: str) -> tuple[st
     if not src.is_file():
         raise FileNotFoundError(f"Frame image not found: {src}")
     stage_dir.mkdir(parents=True, exist_ok=True)
-    unique_name = f"{prefix}_{uuid.uuid4().hex[:6]}{src.suffix.lower() or '.png'}"
+    # Keep filename <= 12 chars so Flow's frame picker never truncates it with '...'.
+    unique_name = f"{prefix}_{uuid.uuid4().hex[:4]}{src.suffix.lower() or '.png'}"
     dst = stage_dir / unique_name
     shutil.copy2(src, dst)
     return str(dst).replace("\\", "/"), unique_name
@@ -697,9 +789,9 @@ def run_single_shot(
     staged_end_base = None
 
     if start_frame:
-        staged_start_path, staged_start_base = _stage_image(start_frame, stage_root / "uploads", f"sf_{out_p.stem}")
+        staged_start_path, staged_start_base = _stage_image(start_frame, stage_root / "uploads", "sf")
     if end_frame:
-        staged_end_path, staged_end_base = _stage_image(end_frame, stage_root / "uploads", f"ef_{out_p.stem}")
+        staged_end_path, staged_end_base = _stage_image(end_frame, stage_root / "uploads", "ef")
 
     dur = _normalize_duration(duration)
     cfg = {
