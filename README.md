@@ -1,8 +1,36 @@
 # EGO Flow 一键出片 (`ego-flow-mv`)
 
-Antigravity 全局插件与自动化 CLI：把**故事 / 脚本 / 分镜创意**直接丢给 AI，自动串起 **关键帧生图 (`gpt-imagecli`) -> EGO 浏览器合法驱动 Google Flow (`Omni 1.2 Flash`) -> 下载 `1080p` 分镜 -> 本地 `ffmpeg` 无缝拼接 + 混音**，端到端输出完整 `.mp4` 成片。
+Antigravity 全局插件与多 Agent 通用自动化 Skill：把**故事 / 脚本 / 分镜创意**直接丢给 AI，自动串起 **关键帧生图 (`gpt-imagecli`) -> EGO 浏览器合法驱动 Google Flow (`Omni 1.2 Flash`) -> 下载 `1080p` 分镜 -> 本地 `ffmpeg` 无缝拼接 + 混音**，端到端输出完整 `.mp4` 成片。
 
-> 声明：本插件严格通过用户本机已登录 Google Flow（`https://flow.google.com/`）的 EGO 浏览器窗口正常交互执行，**不做任何私有 RPC 逆向，也不绕过登录或人机验证**。
+> 声明：本项目严格通过用户本机已登录 Google Flow（`https://flow.google.com/`）的 EGO 浏览器窗口正常交互执行，**不做任何私有 RPC 逆向，也不绕过登录或人机验证**。
+
+## 🚀 一句话无脑安装（直接复制发给你的 AI Agent）
+
+右上角点复制，直接发给你正在用的 **Antigravity / Codex / Claude Code / DSH / OpenCode**，它会自动帮你装好并自检：
+
+### 方式 A：单 Agent 自适应口令（发给任意一个 Agent 即可）
+
+```text
+请帮我安装 https://github.com/hxhptt-dotcom/ego-flow-mv ：如果你是 Antigravity，请直接 git clone 到 ~/.gemini/config/plugins/ego-flow-mv 作为全局插件；如果你是 Codex、Claude Code、DSH 或 OpenCode，请拉取该仓库并将里面的 skills/ego-flow-mv 复制到你自己的全局 skills 目录（Codex: ~/.codex/skills/ego-flow-mv ，Claude Code: ~/.claude/skills/ego-flow-mv ，DSH: ~/.dsh/skills/ego-flow-mv ，OpenCode: ~/.config/opencode/skills/ego-flow-mv），装完运行 python scripts/flow_ego.py --help 验证安装成功。
+```
+
+### 方式 B：全家桶一键通装口令（本机装了多个 Agent 时，一句全同步）
+
+```text
+请帮我把 https://github.com/hxhptt-dotcom/ego-flow-mv 一键部署到本机所有已安装的 AI Agent：先克隆或更新到 ~/.gemini/config/plugins/ego-flow-mv（Antigravity 全局插件），再自动检测本机存在的 ~/.codex/skills、~/.claude/skills、~/.dsh/skills、~/.config/opencode/skills、~/.agents/skills 目录，把 skills/ego-flow-mv 同步进去，最后跑一次 flow_ego.py --help 检查环境（Python / ffmpeg / ego-browser）是否就绪。
+```
+
+### 各家 Agent 默认安装路径速查
+
+| Agent | 安装形态 | 目标路径 |
+| --- | --- | --- |
+| **Antigravity** | 完整全局插件 | `~/.gemini/config/plugins/ego-flow-mv` |
+| **Codex** | Skill 目录 | `~/.codex/skills/ego-flow-mv` |
+| **Claude Code** | Skill 目录 | `~/.claude/skills/ego-flow-mv` |
+| **DSH** | Skill 目录 | `~/.dsh/skills/ego-flow-mv` |
+| **OpenCode** | Skill 目录 | `~/.config/opencode/skills/ego-flow-mv` |
+
+---
 
 ## 核心特性 & 已填平的 6 个实战深坑
 
@@ -29,7 +57,7 @@ ego-flow-mv/
         └── stitch_mv.py
 ```
 
-## 快速安装与依赖
+## 手动命令行安装与前置依赖
 
 前置条件：本机已安装 Python 3.10+、`ffmpeg`/`ffprobe`、EGO Lite（`ego-browser` 已在 `PATH` 中且在 EGO 内登录 Google Flow）。
 

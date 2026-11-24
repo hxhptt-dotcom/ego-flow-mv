@@ -62,10 +62,10 @@ description: Turn a user's story, script, plot idea, or storyboard brief into a 
 }
 ```
 
-直接执行一条命令跑完 EGO 操控 -> Flow 生成 -> `1080p` 下载 -> 本地拼接（支持 `--resume` 断点续跑）：
+直接执行一条命令跑完 EGO 操控 -> Flow 生成 -> `1080p` 下载 -> 本地拼接（支持 `--resume` 断点续跑；`<SKILL_DIR>` 为本 `SKILL.md` 所在目录，如 Antigravity 的 `~/.gemini/config/plugins/ego-flow-mv/skills/ego-flow-mv` 或 Codex/Claude/DSH/OpenCode 的各自 `skills/ego-flow-mv`）：
 
 ```bash
-python "~/.gemini/config/plugins/ego-flow-mv/skills/ego-flow-mv/scripts/flow_ego.py" batch --manifest manifest.json --json
+python "<SKILL_DIR>/scripts/flow_ego.py" batch --manifest manifest.json --json
 ```
 
 ### 4. 已内置封装的 EGO + Flow 实战避坑逻辑
