@@ -1,0 +1,18 @@
+{
+  "name": "ego-flow-mv",
+  "displayName": "EGO Flow 一键出片",
+  "version": "1.0.0",
+  "description": "丢入故事、分镜或脚本，自动出关键帧（gpt-imagecli）、用 EGO 浏览器驱动 Google Flow（Omni 1.2 Flash）批量生成 1080p 视频并本地 ffmpeg 无缝拼接输出完整 MP4。",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "根据这个故事脚本，自动生成关键帧并调 EGO + Google Flow 制作拼接好的 1080p MP4 短片",
+    "用上一集的结尾画面无缝续拍第 2 集并合成为完整竖屏 MV",
+    "检查当前 EGO 浏览器里的 Google Flow 任务空间与登录状态"
+  ],
+  "author": {
+    "name": "hxhptt-dotcom",
+    "url": "https://github.com/hxhptt-dotcom"
+  },
+  "homepage": "https://flow.google.com",
+  "repository": "https://github.com/hxhptt-dotcom/ego-flow-mv"
+}

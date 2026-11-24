@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.ego_flow_tmp/
+.DS_Store
+Thumbs.db
+*.mp4
+*.mov
+*.wav
+*.mp3
