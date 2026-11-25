@@ -34,13 +34,24 @@ Please deploy https://github.com/hxhptt-dotcom/ego-flow-mv to every AI coding ag
 
 ---
 
-## Key Features & 6 Battle-Tested EGO + Google Flow Pitfalls Solved
+## 🧠 v1.1.0 Built-In Director Brain & 38-Case Cinema/Ad Style Atlas
+
+Drop a one-line brief—like *"shoot a minimalist Apple-style earbud commercial"*, *"make a Blade Runner 2049 sci-fi short"*, or *"create a Pixar-style animated short"*—and `ego-flow-mv` automatically selects framing, focal length, subtractive lighting, timed motion beats, and layered soundscapes from its bundled references:
+
+1. **[director-brain.md](skills/ego-flow-mv/references/director-brain.md)**: 3-second genre router + Writer / DP / Art Director / Sound Designer craft rules (60% ambience hierarchy, silence pacing, physical realism checks).
+2. **[genre-playbooks.md](skills/ego-flow-mv/references/genre-playbooks.md)**: 6 ready-to-shoot playbooks (`studio-ad`, `product-demo`, `animated-short` with Character Turnaround Sheets + Match Cut `K1..K(N+1)`, `hollywood-scifi`, `logo-reveal`, `healing-mv`).
+3. **[cinema-style-atlas.md](skills/ego-flow-mv/references/cinema-style-atlas.md)**: Distilled visual techniques and reusable English keywords from 38 benchmark films and iconic commercials (*BR2049*, *Apple*, *Pixar*, *Chanel No.5*, *Volvo*, *In the Mood for Love*, etc.).
+4. **[prompt-architecture.md](skills/ego-flow-mv/references/prompt-architecture.md)**: Timed (`0-3s / 3-7s / 7-10s`) six-part prompt templates, strict POV locks, verbatim character reuse, and pre-flight director checks tuned for Google Flow `Omni 1.2 Flash`.
+
+---
+
+## Key Features & Battle-Tested EGO + Google Flow Pitfalls Solved
 
 1. **PowerShell Quote Immunity**: Always writes a UTF-8 `.mjs` file first and executes `ego-browser nodejs -e "await import('file:///...')"`, completely eliminating Windows shell quoting failures.
 2. **EGO TaskSpace Ownership & Clean Hand-Back**: Calls `listTaskSpaces()` and handles `user` / `agentDelegatedToUser` states via `claimTaskSpace` / `takeOverTaskSpace` + `adopt`, then releases control cleanly in a `finally` block via `task.finish({ keep })`.
-3. **Unambiguous Frame Picker Selection**: Stages each uploaded frame under a unique randomized filename prefix, waits for upload/preview indicators to clear, and explicitly clicks `[role="option"]:has-text("<unique_filename>")` before `Add to prompt` (also clears stuck composer prompts before each shot).
+3. **Unambiguous Frame Picker Selection**: Stages each uploaded frame under a short unique filename (`sf_<hex>` to prevent truncation), waits for upload/preview indicators to clear, scopes selection inside `.cdk-overlay-pane [role="option"]`, and gracefully handles auto-closing modals.
 4. **Zero-Indexed Duration Slider Stepping**: Google Flow's duration slider maps `0..12` to `3s..15s` (`value = duration - 3`) and ignores raw `.value` assignment; `flow_ego.py` focuses the slider and steps with `ArrowLeft` / `ArrowRight` while verifying the trigger readout.
-5. **Scoped Settings Selectors & `1080p` Download Diffing**: Avoids sidebar `Videos` nav collisions, switches to the `videocam` view, snapshots baseline video card count before generation, and downloads the newest leftmost card at `1080p` (with automatic `720p` fallback on timeout; never auto-triggers 50-credit `4K` upscales).
+5. **Scoped Settings, Card Diffing & `1080p` Download**: Filters out pending tiles/duplicate icons when diffing `videocam` cards and uses trusted mouse clicks plus single-arg `page.evaluate` payloads to reliably download the newest leftmost card at `1080p` (with `720p` fallback; never auto-triggers 50-credit `4K`).
 6. **Cross-Platform `ffmpeg` & Silent-Clip Resilience**: Auto-selects `libx264` or Windows MediaFoundation `h264_mf` (`-b:v 18M`) and synthesizes matching `anullsrc` stereo tracks for silent clips so `acrossfade` never fails.
 
 ## Directory Layout
@@ -55,6 +66,11 @@ ego-flow-mv/
 ├── rules/AGENTS.md
 └── skills/ego-flow-mv/
     ├── SKILL.md
+    ├── references/
+    │   ├── director-brain.md
+    │   ├── genre-playbooks.md
+    │   ├── cinema-style-atlas.md
+    │   └── prompt-architecture.md
     └── scripts/
         ├── flow_ego.py
         └── stitch_mv.py
@@ -90,3 +106,11 @@ python skills/ego-flow-mv/scripts/flow_ego.py batch --manifest manifest.json --j
 python skills/ego-flow-mv/scripts/stitch_mv.py last-frame --video shot_01.mp4 --out shot_01_last.png --json
 python skills/ego-flow-mv/scripts/stitch_mv.py s1.mp4 s2.mp4 --out final.mp4 --size 1080x1920 --fps 24 --transitions 0.25 --voiceover vo.mp3 --bgm bgm.mp3 --json
 ```
+
+## Acknowledgements
+
+Our built-in director brain, timed six-part prompt formula, and genre playbooks draw inspiration from these MIT-licensed open-source skills, adapted cleanly for automated `gpt-imagecli` -> EGO Browser -> Google Flow (`Omni 1.2 Flash`) -> `ffmpeg` execution:
+
+- [masonmosen/muse-video-prompt-skill](https://github.com/masonmosen/muse-video-prompt-skill) (timed motion beats & verbatim character-reuse discipline)
+- [sonlovinbot-team/Muse-animated-short-film](https://github.com/sonlovinbot-team/Muse-animated-short-film) (Character Turnaround Sheets, `K1..K(N+1)` Match Cut chaining, & physical realism verification)
+- [LuoJiangYong/muse-video-skill](https://github.com/LuoJiangYong/muse-video-skill) (virtual crew roles, 38-case film/ad taxonomy, & *Reference Image Over Text* rule)

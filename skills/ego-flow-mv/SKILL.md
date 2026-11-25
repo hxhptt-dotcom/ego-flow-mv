@@ -1,31 +1,42 @@
 ---
 name: ego-flow-mv
-description: Turn a user's story, script, plot idea, or storyboard brief into a stitched 1080p MP4 video automatically end-to-end (gpt-imagecli keyframes -> EGO browser driving Google Flow Omni 1.2 Flash -> local ffmpeg xfade+acrossfade stitching). Activate whenever the user drops a story/script/brief and wants an automated MP4 output via EGO and Google Flow.
+description: Turn a user's story, commercial brief, product pitch, sci-fi concept, animation idea, or logo reveal into a stitched 1080p MP4 video automatically end-to-end using built-in director playbooks, a 38-case cinema/ad style atlas, timed six-part prompts, gpt-imagecli keyframes/character sheets, EGO browser driving Google Flow Omni 1.2 Flash, and local ffmpeg xfade+acrossfade stitching.
 ---
 
 # EGO Flow 一键出片流水线 (`ego-flow-mv`)
 
-把「故事 / 脚本 / 创意」一条龙变成带配乐、转场和人声的成品 `1080p` `.mp4`。全程通过你本机已登录 Google Flow（`https://flow.google.com/`）的 **EGO 浏览器 (`ego-browser`)** 驱动网页端合法操作（**绝不做私有 RPC 逆向，也不碰任何验证码/风控绕过**）。
+把「商业广告 / 产品演示 / 好莱坞科幻 / 动画短片 / LOGO 片头 / 校园治愈 MV」一句话创意一条龙变成带配乐、转场和人声的成品 `1080p` `.mp4`。全程通过你本机已登录 Google Flow（`https://flow.google.com/`）的 **EGO 浏览器 (`ego-browser`)** 驱动网页端合法操作（**绝不做私有 RPC 逆向，也不碰任何验证码/风控绕过**）。
 
 ---
 
-## 5 步自动转动轮子 (`Story -> MP4`)
+## 内置导演大脑与灵感参考库 (`references/`)
+接到创作需求时，按题材直接读取对应参考文档定调，无需凭空脑补：
+- [references/director-brain.md](references/director-brain.md)：3 秒题材路由表 + 编剧 / 摄影（景别、焦段、减法布光）/ 美术 / 声音（60% 环境音 + 静默武器）一页纸决策大脑。
+- [references/genre-playbooks.md](references/genre-playbooks.md)：6 大高频题材一键开拍剧本库（商业棚拍广告、产品演示、皮克斯风动画短片、好莱坞科幻大片、品牌 LOGO 片头、治愈系 MV）。
+- [references/cinema-style-atlas.md](references/cinema-style-atlas.md)：38 个影史大片与殿堂级广告（如 *BR2049*、*Apple*、*Pixar*、*Chanel*、*花样年华*）的现成技法与英文关键词速查。
+- [references/prompt-architecture.md](references/prompt-architecture.md)：Google Flow `Omni 1.2 Flash` 按秒卡点六段式英文提示词模板、第一人称 POV 锁、角色三视图公式与开机前 5 秒自检门禁。
 
-### 1. 导演拆镜 (Director Breakdown)
-收到用户的故事、分镜或创意后，拆分成 `N` 个镜头（每镜 **8–12 秒**；例如 20–35 秒短片通常 2–3 镜）：
+---
+
+## 5 步自动转动轮子 (`Idea -> MP4`)
+
+### 1. 导演定调与拆镜 (Director Breakdown)
+收到用户的一句话创意、广告需求或完整剧本后，先查 `references/director-brain.md`、`references/genre-playbooks.md` 与 `references/cinema-style-atlas.md` 锁定画幅、镜数（每镜 **5–12 秒**）、主光源动机、色板与声音路线：
 - **开篇定调镜（Shot 1）**：先用 `gpt-imagecli` 生成第 1 张高清首帧锚点图（竖屏 `--aspect 9:16 --fit 1080x1920` 或横屏 `--aspect 16:9 --fit 1920x1080`）。
-- **同场景连贯续拍镜**：在 `manifest.json` 中设置 `"start_from_prev_last_frame": true`，脚本会自动提取上一镜结尾帧作为本镜首帧，拼接转场设为 `0.2s–0.3s` `fade`。
-- **换场 / 换服装 / 时间跳跃镜**：用 `gpt-imagecli --ref <shot1_anchor.png> --fit 1080x1920` 以第 1 镜锚点图锁死人物五官与身份特征生成新场景首帧，拼接转场设为 `0.5s–0.7s` `fade` 或 `fadeblack`。
+- **动画短片 / 固定 IP 连续剧**：先用 `gpt-imagecli` 生成同画幅**角色三视图母版（Character Sheet）**，再用 `--ref` 画出故事节点关键帧 `K1..K(N+1)`，在 `manifest.json` 中同时传 `"start_frame"` 和 `"end_frame"` 让 Flow 做丝滑 **Match Cut**。
+- **同场景连贯续拍镜**：在 `manifest.json` 中设置 `"start_from_prev_last_frame": true`，脚本会自动提取上一镜结尾帧作为本镜首帧，拼接转场设为 `0.25s–0.3s` `fade`。
+- **换场 / 换服装 / 时间跳跃镜**：用 `gpt-imagecli --ref <char_sheet_or_shot1.png>` 以第 1 镜锚点图锁死人物五官或产品外观生成新场景首帧，拼接转场设为 `0.5s–0.7s` `fade` 或 `fadeblack`。
 
-### 2. 提示词与画质合规护栏 (`Omni 1.2 Flash` + 安全边界)
-写关键帧和 Flow 视频提示词时，严格遵守：
-1. **成人肖像合规**：人物必须明确写出成年年龄与自然写实穿搭（如 `20-year-old young Chinese woman`、`22-year-old young Chinese man`），严禁出现 `girl` / `teen` / `schoolgirl` / `少女` / `女孩` / `纯欲` / `性感` / `暴露` 等高危触发词。
-2. **Flow 全英文单镜防跳切提示词**：
+### 2. 提示词与画质合规护栏 (`Omni 1.2 Flash` + 导演自检)
+严格按 `references/prompt-architecture.md` 组装提示词并在开机前过 5 秒门禁：
+1. **成人肖像合规**：人物必须明确写出成年年龄与自然写实穿搭（如 `21-year-old Chinese woman`、`28-year-old East Asian man`），严禁出现 `girl` / `teen` / `schoolgirl` / `少女` / `女孩` / `纯欲` / `性感` / `暴露` 等高危触发词。
+2. **六段式按秒卡点 + 首尾锁死**：
    - 开头固定加：`"In a single continuous unbroken shot, no scene cuts."`
+   - 动作按 `0-3s / 3-7s / 7-10s` 分段写清物理真实因果，保留情绪微动作（*freezes, hesitates, slowly lifts*），并遵循**参考图优先于文字**（不啰嗦复述首帧静态细节，多镜同一人物描述逐字复用）。
    - 结尾固定加：`"No on-screen text, no subtitles."`
 3. **音频与语种策略**：
-   - `Omni 1.2 Flash` 对**英文歌唱 / 轻哼 / 环境音效 / 原声吉他 BGM**效果极佳；写原创英文短歌词，不要出现受版权保护的歌名或歌手名。
-   - 若用户明确需要**纯正标准中文配音 / 旁白**：Flow 提示词中写 `"No spoken dialogue, natural ambient sound and soft instrumental music."`，同时在本地调用 `stepfun` 技能生成高清中文配音，再传给 `manifest.json` 的 `"voiceover"` 或 `stitch_mv.py --voiceover`。
+   - `Omni 1.2 Flash` 优先写清具体**环境音（60%）+ 动作拟音 Foley + 情绪配乐**，对英文短吟唱 / 原声乐器 / 无对白大片效果极佳；不要出现受版权保护的歌名或歌手名。
+   - 若用户明确需要**纯正标准中文配音 / 广告口播 / 旁白**：Flow 提示词中写 `"No spoken dialogue, crisp natural Foley and ambient soundscape only."`，按每 10 秒 ≤ 1 句写精炼旁白并用本地 `stepfun` 技能配音，再传给 `manifest.json` 的 `"voiceover"` 或 `stitch_mv.py --voiceover`。
 
 ### 3. 一键批量跑片 (`flow_ego.py batch`)
 在工作区输出目录写好 `manifest.json`：

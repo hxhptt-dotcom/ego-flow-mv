@@ -1,12 +1,13 @@
 {
   "name": "ego-flow-mv",
   "displayName": "EGO Flow 一键出片",
-  "version": "1.0.0",
-  "description": "丢入故事、分镜或脚本，自动出关键帧（gpt-imagecli）、用 EGO 浏览器驱动 Google Flow（Omni 1.2 Flash）批量生成 1080p 视频并本地 ffmpeg 无缝拼接输出完整 MP4。",
+  "version": "1.1.0",
+  "description": "内置导演决策大脑、6大题材剧本与38部影史广告技法图谱：丢入一句话创意、商业广告、产品卖点、科幻大片或动画剧本，自动生关键帧（gpt-imagecli）、用 EGO 驱动 Google Flow（Omni 1.2 Flash）批量出 1080p 分镜并本地 ffmpeg 无缝拼接输出完整 MP4。",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
-    "根据这个故事脚本，自动生成关键帧并调 EGO + Google Flow 制作拼接好的 1080p MP4 短片",
-    "用上一集的结尾画面无缝续拍第 2 集并合成为完整竖屏 MV",
+    "按苹果发布会广告风格，给一款极简钛金属降噪耳机拍个 25 秒商业大片 MP4",
+    "按银翼杀手 2049 的巨物赛博美学，拍一段 30 秒好莱坞科幻短片 MP4",
+    "拍一个皮克斯风格的小狐狸动画短片（先出三视图再首尾帧续拍），直接出成片",
     "检查当前 EGO 浏览器里的 Google Flow 任务空间与登录状态"
   ],
   "author": {

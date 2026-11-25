@@ -34,13 +34,24 @@ Antigravity 全局插件与多 Agent 通用自动化 Skill：把**故事 / 脚�
 
 ---
 
+## 🧠 v1.1.0 内置「导演大脑 + 38 案例技法图谱」（不用再靠 AI 硬脑补）
+
+现在只需丢给 Agent 一句话（例如：**“按苹果风拍个耳机广告”**、**“按银翼杀手 2049 拍个科幻大片”**、**“拍个皮克斯治愈动画短片”**），插件会自动翻开内置参考库定好景别、焦段、减法布光、按秒卡点动作和声场配比：
+
+1. **[director-brain.md](skills/ego-flow-mv/references/director-brain.md)**：3 秒题材自动路由表 + 编剧/摄影/美术/声音决策规则（60% 环境音 + 静默武器 + 物理真实性自检）。
+2. **[genre-playbooks.md](skills/ego-flow-mv/references/genre-playbooks.md)**：6 大高频题材一键开拍剧本（棚拍广告 `studio-ad` / 产品演示 `product-demo` / 角色三视图+首尾帧 Match Cut 动画 `animated-short` / 科幻大片 `hollywood-scifi` / 品牌片头 `logo-reveal` / 治愈 MV `healing-mv`）。
+3. **[cinema-style-atlas.md](skills/ego-flow-mv/references/cinema-style-atlas.md)**：浓缩 38 部影史与殿堂级广告（*BR2049*、*流浪地球*、*Apple*、*Pixar*、*Chanel*、*花样年华* 等）的现成镜头语言与英文视觉关键词。
+4. **[prompt-architecture.md](skills/ego-flow-mv/references/prompt-architecture.md)**：专治跳切与变脸的 Google Flow `Omni 1.2 Flash` 按秒卡点六段式模板 + 人物逐字锚定规范。
+
+---
+
 ## 核心特性 & 已填平的 6 个实战深坑
 
 1. **PowerShell 引号免疫**：永远先生成 UTF-8 `.mjs` 文件，再通过 `ego-browser nodejs -e "await import('file:///...')"` 执行，彻底告别引号转义崩溃。
 2. **EGO TaskSpace 无缝接管**：自动 `listTaskSpaces()` 判断 `ownership`（`user` / `agentDelegatedToUser`），按 `claimTaskSpace` / `takeOverTaskSpace` + `adopt` 复用标签，结束后在 `finally` 里调 `task.finish({ keep })` 还回控制权。
-3. **选图弹窗防串图**：上传图片时拷贝为唯一随机前缀临时文件，待上传预览完成后显式点击 `[role="option"]:has-text("<唯一文件名>")` 再点 `添加到提示`，开拍前自动清理残留提示。
+3. **选图弹窗防串图**：上传图片时拷贝为短前缀唯一文件（`sf_<hex>` 避免截断），待上传预览完成后显式点击 `.cdk-overlay-pane [role="option"]` 并兼容选后自动关闭弹窗，开拍前自动清理残留提示。
 4. **时长滑块精确对齐**：`input[aria-label="时长"]` 为 `0..12` 映射 `3..15 秒`（`value = duration - 3`），通过聚焦发送 `ArrowLeft`/`ArrowRight` 精确步进并核对 UI 状态。
-5. **`videocam` 视图卡片 diff 与 `1080p` 下载**：先切视频视图记录基线卡片数，等进度结束且卡片数 `+1` 再打开最新卡片菜单下载 `1080p`（超时自动兜底 `720p`，绝不擅自触发 50 点 `4K`）。
+5. **`videocam` 视图卡片 diff 与 `1080p` 下载**：先切视频视图过滤掉加载占位与重复图标准确数基线卡片，等进度结束且卡片数 `+1` 再以单对象参数坐标定位最新卡片菜单下载 `1080p`（超时自动兜底 `720p`，绝不擅自触发 50 点 `4K`）。
 6. **`ffmpeg` 跨环境兼容与静音防报错**：自动探测 `libx264` 或 Windows `h264_mf`（`-b:v 18M`），对无音轨视频片段自动生成 `anullsrc` 防止 `acrossfade` 滤镜失败。
 
 ## 目录结构
@@ -49,11 +60,17 @@ Antigravity 全局插件与多 Agent 通用自动化 Skill：把**故事 / 脚�
 ego-flow-mv/
 ├── plugin.json
 ├── README.md
+├── README.en.md
 ├── LICENSE
 ├── assets/logo.svg
 ├── rules/AGENTS.md
 └── skills/ego-flow-mv/
     ├── SKILL.md
+    ├── references/
+    │   ├── director-brain.md
+    │   ├── genre-playbooks.md
+    │   ├── cinema-style-atlas.md
+    │   └── prompt-architecture.md
     └── scripts/
         ├── flow_ego.py
         └── stitch_mv.py
@@ -89,3 +106,11 @@ python skills/ego-flow-mv/scripts/flow_ego.py batch --manifest manifest.json --j
 python skills/ego-flow-mv/scripts/stitch_mv.py last-frame --video shot_01.mp4 --out shot_01_last.png --json
 python skills/ego-flow-mv/scripts/stitch_mv.py s1.mp4 s2.mp4 --out final.mp4 --size 1080x1920 --fps 24 --transitions 0.25 --voiceover vo.mp3 --bgm bgm.mp3 --json
 ```
+
+## 致谢（Open-Source Acknowledgements）
+
+本项目的导演工作流、六段式按秒提示词规范及部分题材参考思想吸收了以下 MIT 开源项目的优秀实践并针对 Google Flow + EGO 做了全自动化改造：
+
+- [masonmosen/muse-video-prompt-skill](https://github.com/masonmosen/muse-video-prompt-skill)（六段式按秒提示词与人物描述逐字复用纪律）
+- [sonlovinbot-team/Muse-animated-short-film](https://github.com/sonlovinbot-team/Muse-animated-short-film)（角色三视图母版、`K1..K(N+1)` Match Cut 衔接与物理真实性校验）
+- [LuoJiangYong/muse-video-skill](https://github.com/LuoJiangYong/muse-video-skill)（多角色虚拟剧组视角、38 案例技法索引及「参考图优先于文字」原则）
