@@ -255,43 +255,137 @@ async function ensureFlowProject(page) {{
   return {{ ok: true, projectUrl: await page.url() }};
 }}
 
-async function clickPopoverPill(page, texts) {{
-  const pt = await page.evaluate((targets) => {{
-    const isVisible = (el) => {{
-      const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
-    }};
-    const inIgnoredContainer = (el) => Boolean(
-      el.closest("nav") ||
-      el.closest('button[aria-label="设置触发器"]') ||
-      el.closest('button[aria-label*="Settings"]')
-    );
-    const candidates = [...document.querySelectorAll('button, [role="radio"], [role="tab"]')]
-      .filter((el) => isVisible(el) && !inIgnoredContainer(el));
-    const matches = [];
-    for (const el of candidates) {{
-      const raw = (el.innerText || "").trim();
-      const aria = el.getAttribute("aria-label") || "";
-      for (const t of targets) {{
-        if (raw === t || raw.includes(t) || aria === t || aria.includes(t)) {{
-          const r = el.getBoundingClientRect();
-          matches.push({{ el, r, len: raw.length, area: r.width * r.height }});
-          break;
+async function clickPopoverPill(page, targets) {{
+  const findBestPill = async () => {{
+    return await page.evaluate((targetList) => {{
+      const isVisible = (el) => {{
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
+      }};
+      const inIgnoredContainer = (el) => Boolean(
+        el.closest("nav") ||
+        el.closest('button[aria-label="设置触发器"]') ||
+        el.closest('button[aria-label*="Settings"]')
+      );
+      const popoverSel = '[role="dialog"], [role="menu"], .cdk-overlay-pane, [data-radix-popper-content-wrapper]';
+      const collectMatches = (rootEls) => {{
+        const matches = [];
+        for (const el of rootEls) {{
+          const raw = (el.innerText || "").replace(/\\s+/g, " ").trim();
+          const aria = el.getAttribute("aria-label") || "";
+          const role = el.getAttribute("role") || "";
+          const isRadioOrTab = role === "radio" || role === "tab";
+          for (const t of targetList) {{
+            if (raw === t || raw.includes(t) || aria === t || aria.includes(t)) {{
+              const r = el.getBoundingClientRect();
+              const checked = el.getAttribute("aria-checked") === "true" || el.getAttribute("aria-selected") === "true";
+              matches.push({{
+                text: raw,
+                checked,
+                isRadioOrTab,
+                len: raw.length,
+                area: r.width * r.height,
+                x: Math.round(r.left + r.width / 2),
+                y: Math.round(r.top + r.height / 2),
+              }});
+              break;
+            }}
+          }}
+        }}
+        matches.sort((a, b) =>
+          Number(b.isRadioOrTab) - Number(a.isRadioOrTab) ||
+          a.area - b.area ||
+          a.len - b.len
+        );
+        return matches[0] || null;
+      }};
+
+      const popovers = [...document.querySelectorAll(popoverSel)];
+      const scopedCandidates = [];
+      for (const p of popovers) {{
+        for (const el of p.querySelectorAll('[role="radio"], [role="tab"], button')) {{
+          if (isVisible(el) && !inIgnoredContainer(el)) scopedCandidates.push(el);
         }}
       }}
+      const scopedMatch = collectMatches(scopedCandidates);
+      if (scopedMatch) return {{ ...scopedMatch, scoped: true }};
+
+      const fallbackCandidates = [...document.querySelectorAll('[role="radio"], [role="tab"], button')]
+        .filter((el) => isVisible(el) && !inIgnoredContainer(el));
+      const fallbackMatch = collectMatches(fallbackCandidates);
+      return fallbackMatch ? {{ ...fallbackMatch, scoped: false }} : null;
+    }}, targets);
+  }};
+
+  let pill = await findBestPill();
+  if (!pill) return null;
+  if (pill.checked) return {{ text: pill.text, alreadyChecked: true }};
+
+  for (let attempt = 1; attempt <= 3; attempt++) {{
+    pill = await findBestPill();
+    if (!pill) return null;
+    if (pill.checked) return {{ text: pill.text, alreadyChecked: false }};
+
+    if (attempt <= 2) {{
+      await page.mouse.click(pill.x, pill.y, {{ label: "select popover pill " + pill.text }});
+      await page.waitForTimeout(350);
+    }} else {{
+      await page.evaluate((targetList) => {{
+        const isVisible = (el) => {{
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
+        }};
+        const inIgnoredContainer = (el) => Boolean(
+          el.closest("nav") ||
+          el.closest('button[aria-label="设置触发器"]') ||
+          el.closest('button[aria-label*="Settings"]')
+        );
+        const popoverSel = '[role="dialog"], [role="menu"], .cdk-overlay-pane, [data-radix-popper-content-wrapper]';
+        const popovers = [...document.querySelectorAll(popoverSel)];
+        const pool = [];
+        for (const p of popovers) {{
+          for (const el of p.querySelectorAll('[role="radio"], [role="tab"], button')) {{
+            if (isVisible(el) && !inIgnoredContainer(el)) pool.push(el);
+          }}
+        }}
+        const allPool = pool.length
+          ? pool
+          : [...document.querySelectorAll('[role="radio"], [role="tab"], button')]
+              .filter((el) => isVisible(el) && !inIgnoredContainer(el));
+        const matches = [];
+        for (const el of allPool) {{
+          const raw = (el.innerText || "").replace(/\\s+/g, " ").trim();
+          const aria = el.getAttribute("aria-label") || "";
+          const role = el.getAttribute("role") || "";
+          for (const t of targetList) {{
+            if (raw === t || raw.includes(t) || aria === t || aria.includes(t)) {{
+              const r = el.getBoundingClientRect();
+              matches.push({{ el, isRadioOrTab: role === "radio" || role === "tab", area: r.width * r.height, len: raw.length }});
+              break;
+            }}
+          }}
+        }}
+        matches.sort((a, b) => Number(b.isRadioOrTab) - Number(a.isRadioOrTab) || a.area - b.area || a.len - b.len);
+        if (matches[0]?.el) matches[0].el.click();
+      }}, targets);
+      await page.waitForTimeout(400);
     }}
-    if (!matches.length) return null;
-    matches.sort((a, b) => a.area - b.area || a.len - b.len);
-    const m = matches[0];
-    return {{
-      x: Math.round(m.r.left + m.r.width / 2),
-      y: Math.round(m.r.top + m.r.height / 2),
-      text: (m.el.innerText || "").trim(),
-    }};
-  }}, texts);
-  if (!pt) return null;
-  await page.mouse.click(pt.x, pt.y, {{ label: "select popover pill " + pt.text }});
-  return pt.text;
+
+    const after = await findBestPill();
+    if (after?.checked) return {{ text: after.text, alreadyChecked: false }};
+  }}
+
+  return {{ text: pill.text, alreadyChecked: false }};
+}}
+
+function matchesAspectTrigger(triggerText, aspect) {{
+  if (aspect === "16:9") {{
+    return (triggerText.includes("crop_16_9") || triggerText.includes("16:9")) && !triggerText.includes("crop_9_16");
+  }}
+  if (aspect === "9:16") {{
+    return (triggerText.includes("crop_9_16") || triggerText.includes("9:16")) && !triggerText.includes("crop_16_9");
+  }}
+  return triggerText.includes(aspect);
 }}
 
 async function configureSettings(page) {{
@@ -318,19 +412,25 @@ async function configureSettings(page) {{
 
   // Select Video mode, Frames vs Ingredients mode, Aspect, Resolution, Output Count x1.
   await clickPopoverPill(page, ["视频", "Video"]);
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(450);
 
   if (CFG.videoSubMode === "frames") {{
     await clickPopoverPill(page, ["帧", "Frames", "crop_free"]);
   }} else if (CFG.videoSubMode === "ingredients") {{
     await clickPopoverPill(page, ["素材", "Ingredients", "chrome_extension"]);
   }}
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(400);
 
-  await clickPopoverPill(page, [CFG.aspect]);
-  await page.waitForTimeout(200);
+  const aspectTargets = CFG.aspect === "16:9"
+    ? ["16:9", "crop_16_9", "横向", "Landscape"]
+    : CFG.aspect === "9:16"
+      ? ["9:16", "crop_9_16", "纵向", "Portrait"]
+      : [CFG.aspect];
+  await clickPopoverPill(page, aspectTargets);
+  await page.waitForTimeout(300);
+
   await clickPopoverPill(page, [CFG.res]);
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(250);
   await clickPopoverPill(page, ["x1"]);
   await page.waitForTimeout(250);
 
@@ -351,12 +451,32 @@ async function configureSettings(page) {{
     }}
   }}
 
-  const triggerText = await page.evaluate(
+  const readTriggerText = () => page.evaluate(
     (sel) => document.querySelector(sel)?.innerText?.replace(/\\s+/g, " ").trim() || "",
     triggerSel,
   );
-  await page.click(triggerSel, {{ label: "close Flow generation settings" }});
+  let triggerText = await readTriggerText();
+  if (!matchesAspectTrigger(triggerText, CFG.aspect)) {{
+    await clickPopoverPill(page, aspectTargets);
+    await page.waitForTimeout(400);
+    triggerText = await readTriggerText();
+    if (!matchesAspectTrigger(triggerText, CFG.aspect)) {{
+      throw new Error("ASPECT_MISMATCH: expected " + CFG.aspect + ", got triggerText=" + triggerText);
+    }}
+  }}
+
+  await page.keyboard.press("Escape");
   await page.waitForTimeout(350);
+  const stillOpen = await page.evaluate(() => {{
+    const p = document.querySelector('[role="dialog"], [role="menu"], .cdk-overlay-pane, [data-radix-popper-content-wrapper]');
+    if (!p) return false;
+    const r = p.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && Boolean(p.querySelector('[role="radio"]'));
+  }});
+  if (stillOpen) {{
+    await page.click(triggerSel, {{ label: "close Flow generation settings" }});
+    await page.waitForTimeout(350);
+  }}
   return triggerText;
 }}
 
@@ -527,7 +647,7 @@ async function scanVideoCards(page) {{
         cur = cur.parentElement;
       }}
       const r = cur?.getBoundingClientRect();
-      if (!r || r.width > 340 || r.height < 90) continue;
+      if (!r || r.width > 760 || r.height < 90 || r.height > 650) continue;
       const cx = Math.round(r.left + r.width / 2);
       const cy = Math.round(r.top + r.height / 2);
       if (cards.some((c) => Math.abs(c.x - cx) < 40 && Math.abs(c.y - cy) < 60)) continue;
@@ -623,81 +743,176 @@ async function main() {{
 
   await page.waitForTimeout(2000);
   const newest = finalState.cards[0];
-  let moreBtn = null;
-  for (const offsetY of [0, -30, 30]) {{
-    await page.mouse.move(newest.x, newest.y + offsetY, {{ label: "hover newest video card" }});
-    await page.waitForTimeout(800);
-    moreBtn = await page.evaluate(({{ tx, ty }}) => {{
+
+  async function dismissSnackbars() {{
+    const pts = await page.evaluate(() => {{
+      const out = [];
+      const containers = document.querySelectorAll(
+        'mat-snack-bar-container, .mat-mdc-snack-bar-container, .mdc-snackbar, .cdk-overlay-pane',
+      );
+      for (const c of containers) {{
+        const txt = (c.innerText || "").trim();
+        const isSnack =
+          c.matches('mat-snack-bar-container, .mat-mdc-snack-bar-container, .mdc-snackbar') ||
+          txt.includes("高清重塑") ||
+          txt.includes("Upscaling");
+        if (!isSnack) continue;
+        const btns = [...c.querySelectorAll("button")].filter((b) => {{
+          const r = b.getBoundingClientRect();
+          const t = (b.innerText || "").trim();
+          return r.width > 0 && r.height > 0 && (t === "关闭" || t === "Close" || t === "Dismiss" || t.includes("close"));
+        }});
+        for (const b of btns) {{
+          const r = b.getBoundingClientRect();
+          out.push({{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }});
+        }}
+      }}
+      return out;
+    }});
+    for (const pt of pts) {{
+      await page.mouse.click(pt.x, pt.y, {{ label: "dismiss Flow snackbar banner" }});
+      await page.waitForTimeout(250);
+    }}
+  }}
+
+  async function findCardMoreBtn(targetCard) {{
+    return await page.evaluate(({{ tx, ty, tw, th }}) => {{
       const btns = [...document.querySelectorAll("button")].filter((b) => {{
         const lbl = (b.textContent || b.innerText || "");
         if (!lbl.includes("more_vert")) return false;
         const r = b.getBoundingClientRect();
-        return r.width > 0 && Math.abs(r.left + r.width / 2 - tx) < 140 && Math.abs(r.top + r.height / 2 - ty) < 200;
+        if (r.width <= 0 || r.height <= 0) return false;
+        const bx = r.left + r.width / 2;
+        const by = r.top + r.height / 2;
+        return (
+          bx >= tx - tw / 2 - 16 &&
+          bx <= tx + tw / 2 + 16 &&
+          by >= ty - th / 2 - 16 &&
+          by <= ty + th / 2 + 16
+        );
       }});
       if (!btns.length) return null;
+      const cornerX = tx + tw / 2;
+      const cornerY = ty - th / 2;
       btns.sort((a, b) => {{
         const ra = a.getBoundingClientRect();
         const rb = b.getBoundingClientRect();
-        const da = Math.hypot(ra.left - tx, ra.top - ty);
-        const db = Math.hypot(rb.left - tx, rb.top - ty);
+        const da = Math.hypot(ra.left + ra.width / 2 - cornerX, ra.top + ra.height / 2 - cornerY);
+        const db = Math.hypot(rb.left + rb.width / 2 - cornerX, rb.top + rb.height / 2 - cornerY);
         return da - db;
       }});
       const r = btns[0].getBoundingClientRect();
       return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
-    }}, {{ tx: newest.x, ty: newest.y }});
-    if (moreBtn) break;
+    }}, {{ tx: targetCard.x, ty: targetCard.y, tw: targetCard.w, th: targetCard.h }});
   }}
 
-  if (!moreBtn) {{
-    emit({{ ok: false, error: "MORE_MENU_BUTTON_NOT_FOUND", newest, projectUrl: projectState.projectUrl }});
-    return;
-  }}
+  async function openDownloadSubmenu(targetCard) {{
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    await dismissSnackbars();
 
-  await page.mouse.click(moreBtn.x, moreBtn.y, {{ label: "open card options menu" }});
-  await page.waitForTimeout(600);
+    let moreBtn = null;
+    for (const offsetY of [0, -30, 30]) {{
+      await page.mouse.move(targetCard.x, targetCard.y + offsetY, {{ label: "hover newest video card" }});
+      await page.waitForTimeout(800);
+      moreBtn = await findCardMoreBtn(targetCard);
+      if (moreBtn) break;
+    }}
+    if (!moreBtn) return {{ ok: false, error: "MORE_MENU_BUTTON_NOT_FOUND" }};
 
-  const dlMenuPt = await page.evaluate(() => {{
-    const items = [...document.querySelectorAll('[role="menuitem"]')].filter((el) => {{
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return false;
-      const t = (el.innerText || "").trim();
-      return t.includes("下载") || t.includes("Download");
+    await page.mouse.click(moreBtn.x, moreBtn.y, {{ label: "open card options menu" }});
+    await page.waitForTimeout(600);
+
+    const queryDlItem = () => page.evaluate(() => {{
+      const items = [...document.querySelectorAll('[role="menuitem"]')].filter((el) => {{
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return false;
+        const t = (el.innerText || "").trim();
+        return t.includes("下载") || t.includes("Download");
+      }});
+      if (!items.length) return null;
+      const r = items[0].getBoundingClientRect();
+      return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
     }});
-    if (!items.length) return null;
-    const r = items[0].getBoundingClientRect();
-    return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
-  }});
-  if (!dlMenuPt) {{
-    emit({{ ok: false, error: "DOWNLOAD_MENU_ITEM_NOT_FOUND", projectUrl: projectState.projectUrl }});
-    return;
-  }}
 
-  await page.mouse.move(dlMenuPt.x, dlMenuPt.y, {{ label: "hover Download submenu" }});
-  await page.waitForTimeout(500);
-  const subOpen = await page.evaluate(
-    () => document.body.innerText.includes("1080p") || document.body.innerText.includes("720p"),
-  );
-  if (!subOpen) {{
-    await page.mouse.click(dlMenuPt.x, dlMenuPt.y, {{ label: "click Download submenu" }});
+    let dlMenuPt = await queryDlItem();
+    if (!dlMenuPt) {{
+      await dismissSnackbars();
+      await page.mouse.move(targetCard.x, targetCard.y, {{ label: "re-hover video card" }});
+      await page.waitForTimeout(500);
+      await page.evaluate(({{ tx, ty, tw, th }}) => {{
+        const btns = [...document.querySelectorAll("button")].filter((b) => {{
+          const lbl = (b.textContent || b.innerText || "");
+          if (!lbl.includes("more_vert")) return false;
+          const r = b.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) return false;
+          const bx = r.left + r.width / 2;
+          const by = r.top + r.height / 2;
+          return (
+            bx >= tx - tw / 2 - 16 &&
+            bx <= tx + tw / 2 + 16 &&
+            by >= ty - th / 2 - 16 &&
+            by <= ty + th / 2 + 16
+          );
+        }});
+        if (!btns.length) return;
+        const cornerX = tx + tw / 2;
+        const cornerY = ty - th / 2;
+        btns.sort((a, b) => {{
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          return Math.hypot(ra.left + ra.width / 2 - cornerX, ra.top + ra.height / 2 - cornerY) -
+                 Math.hypot(rb.left + rb.width / 2 - cornerX, rb.top + rb.height / 2 - cornerY);
+        }});
+        btns[0].click();
+      }}, {{ tx: targetCard.x, ty: targetCard.y, tw: targetCard.w, th: targetCard.h }});
+      await page.waitForTimeout(600);
+      dlMenuPt = await queryDlItem();
+    }}
+    if (!dlMenuPt) return {{ ok: false, error: "DOWNLOAD_MENU_ITEM_NOT_FOUND" }};
+
+    await page.mouse.move(dlMenuPt.x, dlMenuPt.y, {{ label: "hover Download submenu" }});
     await page.waitForTimeout(500);
+    const subOpen = await page.evaluate(() => {{
+      return [...document.querySelectorAll('[role="menuitem"]')].some((el) => {{
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return false;
+        const t = el.innerText || "";
+        return t.includes("1080p") || t.includes("720p");
+      }});
+    }});
+    if (!subOpen) {{
+      await page.mouse.click(dlMenuPt.x, dlMenuPt.y, {{ label: "click Download submenu" }});
+      await page.waitForTimeout(500);
+    }}
+    return {{ ok: true }};
   }}
 
   let download = null;
   let actualDlRes = CFG.dlRes;
   const targets = CFG.dlRes === "1080p" && CFG.fallback720p ? ["1080p", "720p"] : [CFG.dlRes];
   for (const resLabel of targets) {{
+    const menuRes = await openDownloadSubmenu(newest);
+    if (!menuRes.ok) {{
+      if (resLabel === targets[targets.length - 1]) {{
+        emit({{ ok: false, error: menuRes.error, newest, projectUrl: projectState.projectUrl }});
+        return;
+      }}
+      continue;
+    }}
     try {{
       const resPt = await page.evaluate((lbl) => {{
         const items = [...document.querySelectorAll('[role="menuitem"]')].filter((el) => {{
           const r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && (el.innerText || "").includes(lbl);
+          const t = el.innerText || "";
+          return r.width > 0 && r.height > 0 && t.includes(lbl) && !t.includes("4K");
         }});
         if (!items.length) return null;
         const r = items[0].getBoundingClientRect();
         return {{ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }};
       }}, resLabel);
       if (!resPt) throw new Error("Resolution menu item not found: " + resLabel);
-      const dlPromise = page.waitForEvent("download", {{ timeout: resLabel === "1080p" ? 160_000 : 120_000 }});
+      const dlPromise = page.waitForEvent("download", {{ timeout: resLabel === "1080p" ? 240_000 : 120_000 }});
       await page.mouse.click(resPt.x, resPt.y, {{ label: `download video at ${{resLabel}}` }});
       download = await dlPromise;
       actualDlRes = resLabel;
@@ -827,7 +1042,7 @@ def run_single_shot(
         }
 
     try:
-        res_obj = _run_mjs(shot_mjs, stage_root / "scripts", f"shot_{out_p.stem}.mjs", timeout=timeout + 240)
+        res_obj = _run_mjs(shot_mjs, stage_root / "scripts", f"shot_{out_p.stem}.mjs", timeout=timeout + 360)
         if not res_obj.get("ok"):
             return res_obj
         res_obj["probe"] = stitch_mv.probe_media(out_p)
